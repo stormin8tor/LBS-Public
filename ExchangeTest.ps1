@@ -37,17 +37,20 @@ $xaml = @"
 </Window>
 "@
 
+# Fix XML parsing issues by using StringReader
 $reader = New-Object System.Xml.XmlTextReader ([System.IO.StringReader]::new($xaml))
+
+# Load XAML and create the window
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
-# Grab controls by name
+# Retrieve controls by name
 $MailboxBox = $window.FindName("MailboxTextBox")
 $FullBox    = $window.FindName("FullAccessTextBox")
 $SendAsBox  = $window.FindName("SendAsTextBox")
 $OutputBox  = $window.FindName("OutputTextBox")
 $ApplyBtn   = $window.FindName("ApplyButton")
 
-# Define what happens when clicking the button
+# Button click handler
 $Apply_Click = {
     $mailbox = $MailboxBox.Text.Trim()
     $fullUsers = $FullBox.Text.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
