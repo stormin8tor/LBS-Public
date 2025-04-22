@@ -1,7 +1,10 @@
 Add-Type -AssemblyName PresentationFramework
+Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
 
-[xml]$xaml = @"
+# XAML layout for WPF window
+$XAML = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Exchange Permission Tool" Height="450" Width="600">
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -11,7 +14,7 @@ Add-Type -AssemblyName PresentationFramework
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Mailbox to Assign Permissions To:" />
             <TextBox x:Name="MailboxTextBox" Height="25"/>
@@ -27,61 +30,71 @@ Add-Type -AssemblyName PresentationFramework
             <TextBox x:Name="SendAsTextBox" Height="25"/>
         </StackPanel>
 
-        <TextBox x:Name="OutputTextBox" Grid.Row="3" IsReadOnly="True" 
+        <TextBox x:Name="OutputTextBox" Grid.Row="3" IsReadOnly="True"
                  TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10"/>
 
-        <Button Grid.Row="4" Content="Apply Permissions" Height="35" Width="150" 
-                HorizontalAlignment="Center" Click="Apply_Click"/>
+        <Button x:Name="ApplyButton" Grid.Row="4" Content="Apply Permissions" Height="35" Width="150"
+                HorizontalAlignment="Center"/>
     </Grid>
 </Window>
 "@
 
-$reader = (New-Object System.Xml.XmlNodeReader $xaml)
+# Load WPF Window
+$reader = New-Object System.Xml.XmlNodeReader $XAML
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
-# Get UI elements
+# Get controls
 $MailboxBox    = $window.FindName("MailboxTextBox")
 $FullBox       = $window.FindName("FullAccessTextBox")
 $SendAsBox     = $window.FindName("SendAsTextBox")
 $OutputBox     = $window.FindName("OutputTextBox")
+$ApplyButton   = $window.FindName("ApplyButton")
 
-# Event Handler
-$Apply_Click = {
-    $mailbox = $MailboxBox.Text.Trim()
-    $fullUsers = $FullBox.Text -split "," | ForEach-Object { $_.Trim() }
-    $sendAsUsers = $SendAsBox.Text -split "," | ForEach-Object { $_.Trim() }
-
-    $OutputBox.Text = "Connecting to Exchange Online...`n"
-    
-    try {
-        if (-not (Get-Module -ListAvailable -Name ExchangeOnlineManagement)) {
-            Install-Module ExchangeOnlineManagement -Force -AllowClobber -Scope CurrentUser
-        }
-        Import-Module ExchangeOnlineManagement -ErrorAction Stop
-        $cred = Get-Credential
-        Connect-ExchangeOnline -UserPrincipalName $cred.UserName
-
-        foreach ($user in $fullUsers) {
-            if ($user) {
-                $OutputBox.AppendText("Adding Full Access for $user...`n")
-                # Uncomment to apply
-                # Add-MailboxPermission -Identity $mailbox -User $user -AccessRights FullAccess -InheritanceType All
-            }
-        }
-
-        foreach ($user in $sendAsUsers) {
-            if ($user) {
-                $OutputBox.AppendText("Adding Send As for $user...`n")
-                # Uncomment to apply
-                # Add-RecipientPermission -Identity $mailbox -Trustee $user -AccessRights SendAs
-            }
-        }
-
-        $OutputBox.AppendText("All done.`n")
-    } catch {
-        $OutputBox.AppendText("Error: $_`n")
-    }
+# Helper: Write to output box
+function Write-OutputBox {
+    param ([string]$Text)
+    $OutputBox.AppendText("$Text`n")
+    $OutputBox.ScrollToEnd()
 }
 
-$window.FindName("Apply_Click").Add_Click($Apply_Click)
-$window.ShowDialog()
+# Apply permissions button click handler
+$ApplyButton.Add_Click({
+    $OutputBox.Clear()
+
+    $mailbox = $MailboxBox.Text.Trim()
+    $fullAccessUsers = $FullBox.Text.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+    $sendAsUsers     = $SendAsBox.Text.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+    if (-not $mailbox) {
+        Write-OutputBox "Please enter a mailbox to assign permissions to."
+        return
+    }
+
+    try {
+        Write-OutputBox "Connecting to Exchange Online..."
+        $cred = Get-Credential
+        Connect-ExchangeOnline -UserPrincipalName $cred.UserName -ShowProgress $true
+        Write-OutputBox "Connected successfully."
+
+        Write-OutputBox "`nAssigning Full Access Permissions..."
+        foreach ($user in $fullAccessUsers) {
+            Write-OutputBox "  Adding Full Access for $user..."
+            # Uncomment below to actually apply
+            # Add-MailboxPermission -Identity $mailbox -User $user -AccessRights FullAccess -InheritanceType All
+        }
+
+        Write-OutputBox "`nAssigning Send As Permissions..."
+        foreach ($user in $sendAsUsers) {
+            Write-OutputBox "  Adding Send As for $user..."
+            # Uncomment below to actually apply
+            # Add-RecipientPermission -Identity $mailbox -Trustee $user -AccessRights SendAs -Confirm:$false
+        }
+
+        Write-OutputBox "`nAll permissions applied successfully!"
+    } catch {
+        Write-OutputBox "Error: $($_.Exception.Message)"
+    }
+})
+
+# Show the window
+$window.ShowDialog() | Out-Null
