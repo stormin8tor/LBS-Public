@@ -1,139 +1,139 @@
-# Exchange Permission Tool - Direct Execution Version
-# This script is designed to be executed directly from GitHub with: irm <url> | iex
-
-function Show-ExchangePermissionTool {
-    # Check if Exchange module is loaded
-    $exchangeModuleLoaded = $false
-    try {
-        # Check if we have Exchange cmdlets available
-        Get-Command Add-MailboxPermission -ErrorAction Stop | Out-Null
-        $exchangeModuleLoaded = $true
-    } catch {
-        # Module not loaded - will handle in the UI
-    }
-
-    Add-Type -AssemblyName PresentationFramework
+$code = @'
+# Exchange Permission Tool
+function Show-ExchangeTool {
     Add-Type -AssemblyName System.Windows.Forms
     
-    # Create the form without using XAML
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Exchange Permission Tool"
-    $form.Size = New-Object System.Drawing.Size(600, 450)
-    $form.StartPosition = "CenterScreen"
+    # Check for Exchange module
+    $hasExchange = $false
+    try { Get-Command Get-Mailbox -ErrorAction Stop | Out-Null; $hasExchange = $true } catch {}
     
-    # Mailbox Label
+    # Create form elements
+    $form = New-Object -TypeName System.Windows.Forms.Form
+    $form.Text = "Exchange Permission Tool"
+    $form.Width = 500
+    $form.Height = 400
+    
+    $y = 10
+    
+    # Mailbox section
     $lblMailbox = New-Object System.Windows.Forms.Label
-    $lblMailbox.Location = New-Object System.Drawing.Point(10, 20)
-    $lblMailbox.Size = New-Object System.Drawing.Size(400, 20)
-    $lblMailbox.Text = "Mailbox to Assign Permissions To:"
+    $lblMailbox.Text = "Mailbox:"
+    $lblMailbox.Location = New-Object System.Drawing.Point(10, $y)
+    $lblMailbox.Width = 100
     $form.Controls.Add($lblMailbox)
     
-    # Mailbox Textbox
     $txtMailbox = New-Object System.Windows.Forms.TextBox
-    $txtMailbox.Location = New-Object System.Drawing.Point(10, 40)
-    $txtMailbox.Size = New-Object System.Drawing.Size(560, 25)
+    $txtMailbox.Location = New-Object System.Drawing.Point(120, $y)
+    $txtMailbox.Width = 350
     $form.Controls.Add($txtMailbox)
+    $y += 30
     
-    # FullAccess Label
+    # Full Access section
     $lblFullAccess = New-Object System.Windows.Forms.Label
-    $lblFullAccess.Location = New-Object System.Drawing.Point(10, 70)
-    $lblFullAccess.Size = New-Object System.Drawing.Size(400, 20)
-    $lblFullAccess.Text = "Full Access Users (comma-separated):"
+    $lblFullAccess.Text = "Full Access:"
+    $lblFullAccess.Location = New-Object System.Drawing.Point(10, $y)
+    $lblFullAccess.Width = 100
     $form.Controls.Add($lblFullAccess)
     
-    # FullAccess Textbox
     $txtFullAccess = New-Object System.Windows.Forms.TextBox
-    $txtFullAccess.Location = New-Object System.Drawing.Point(10, 90)
-    $txtFullAccess.Size = New-Object System.Drawing.Size(560, 25)
+    $txtFullAccess.Location = New-Object System.Drawing.Point(120, $y)
+    $txtFullAccess.Width = 350
     $form.Controls.Add($txtFullAccess)
+    $y += 30
     
-    # SendAs Label
+    # Send As section
     $lblSendAs = New-Object System.Windows.Forms.Label
-    $lblSendAs.Location = New-Object System.Drawing.Point(10, 120)
-    $lblSendAs.Size = New-Object System.Drawing.Size(400, 20)
-    $lblSendAs.Text = "Send As Users (comma-separated):"
+    $lblSendAs.Text = "Send As:"
+    $lblSendAs.Location = New-Object System.Drawing.Point(10, $y)
+    $lblSendAs.Width = 100
     $form.Controls.Add($lblSendAs)
     
-    # SendAs Textbox
     $txtSendAs = New-Object System.Windows.Forms.TextBox
-    $txtSendAs.Location = New-Object System.Drawing.Point(10, 140)
-    $txtSendAs.Size = New-Object System.Drawing.Size(560, 25)
+    $txtSendAs.Location = New-Object System.Drawing.Point(120, $y)
+    $txtSendAs.Width = 350
     $form.Controls.Add($txtSendAs)
+    $y += 30
     
-    # Output Textbox
-    $txtOutput = New-Object System.Windows.Forms.TextBox
-    $txtOutput.Location = New-Object System.Drawing.Point(10, 170)
-    $txtOutput.Size = New-Object System.Drawing.Size(560, 180)
-    $txtOutput.Multiline = $true
-    $txtOutput.ScrollBars = "Vertical"
-    $txtOutput.ReadOnly = $true
-    $form.Controls.Add($txtOutput)
+    # Results section
+    $txtResults = New-Object System.Windows.Forms.TextBox
+    $txtResults.Multiline = $true
+    $txtResults.ScrollBars = "Vertical"
+    $txtResults.Location = New-Object System.Drawing.Point(10, $y)
+    $txtResults.Width = 460
+    $txtResults.Height = 200
+    $txtResults.ReadOnly = $true
+    $form.Controls.Add($txtResults)
+    $y += 210
     
-    # Apply Button
+    # Button 
     $btnApply = New-Object System.Windows.Forms.Button
-    $btnApply.Location = New-Object System.Drawing.Point(225, 360)
-    $btnApply.Size = New-Object System.Drawing.Size(150, 35)
     $btnApply.Text = "Apply Permissions"
+    $btnApply.Location = New-Object System.Drawing.Point(185, $y)
+    $btnApply.Width = 130
     $form.Controls.Add($btnApply)
     
-    # Add status message at startup
-    if (-not $exchangeModuleLoaded) {
-        $txtOutput.Text = "Warning: Exchange module not detected.`r`nPlease connect to Exchange first using Connect-ExchangeOnline or the appropriate Exchange connection cmdlet."
+    # Set initial status message
+    if ($hasExchange) {
+        $txtResults.Text = "Ready to apply permissions."
     } else {
-        $txtOutput.Text = "Ready. Exchange module loaded successfully."
+        $txtResults.Text = "Exchange module not detected. Please connect to Exchange first."
     }
     
-    # Button click handler
+    # Button click event
     $btnApply.Add_Click({
-        if (-not $exchangeModuleLoaded) {
-            $txtOutput.Text = "Exchange module is not loaded. Please connect to Exchange first.`r`nRun 'Connect-ExchangeOnline' or import the appropriate Exchange module before using this tool."
+        if (-not $hasExchange) {
+            $txtResults.Text = "Exchange module not loaded. Please run Connect-ExchangeOnline first."
             return
         }
-
+        
         $mailbox = $txtMailbox.Text.Trim()
-        $fullUsers = $txtFullAccess.Text.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-        $sendAsUsers = $txtSendAs.Text.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-        
-        $txtOutput.Clear()
-        
         if (-not $mailbox) {
-            $txtOutput.AppendText("Mailbox cannot be empty.`r`n")
+            $txtResults.Text = "Please enter a mailbox name."
             return
         }
         
-        # Verify mailbox exists
+        $txtResults.Text = ""
+        
         try {
+            # Check if mailbox exists
             Get-Mailbox -Identity $mailbox -ErrorAction Stop | Out-Null
-            $txtOutput.AppendText("Found mailbox: $mailbox`r`n")
+            $txtResults.AppendText("Found mailbox: $mailbox`r`n")
+            
+            # Process Full Access users
+            $fullUsers = $txtFullAccess.Text.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            foreach ($user in $fullUsers) {
+                try {
+                    Add-MailboxPermission -Identity $mailbox -User $user -AccessRights FullAccess -InheritanceType All -AutoMapping $false -ErrorAction Stop
+                    $txtResults.AppendText("Added Full Access for: $user`r`n")
+                } catch {
+                    $txtResults.AppendText("Error adding Full Access for $user: $_`r`n") 
+                }
+            }
+            
+            # Process Send As users
+            $sendAsUsers = $txtSendAs.Text.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            foreach ($user in $sendAsUsers) {
+                try {
+                    Add-RecipientPermission -Identity $mailbox -Trustee $user -AccessRights SendAs -Confirm:$false -ErrorAction Stop
+                    $txtResults.AppendText("Added Send As for: $user`r`n")
+                } catch {
+                    $txtResults.AppendText("Error adding Send As for $user: $_`r`n")
+                }
+            }
+            
+            $txtResults.AppendText("Operations completed.`r`n")
         } catch {
-            $txtOutput.AppendText("Error: Mailbox '$mailbox' not found or access denied. $_`r`n")
-            return
+            $txtResults.AppendText("Error: $_`r`n")
         }
-        
-        foreach ($user in $fullUsers) {
-            try {
-                Add-MailboxPermission -Identity $mailbox -User $user -AccessRights FullAccess -InheritanceType All -AutoMapping $false
-                $txtOutput.AppendText("Granted FullAccess to $user`r`n")
-            } catch {
-                $txtOutput.AppendText("Failed FullAccess for $user: $_`r`n")
-            }
-        }
-        
-        foreach ($user in $sendAsUsers) {
-            try {
-                Add-RecipientPermission -Identity $mailbox -Trustee $user -AccessRights SendAs -Confirm:$false
-                $txtOutput.AppendText("Granted SendAs to $user`r`n")
-            } catch {
-                $txtOutput.AppendText("Failed SendAs for $user: $_`r`n")
-            }
-        }
-        
-        $txtOutput.AppendText("Operation completed.`r`n")
     })
     
-    # Show the form
-    $form.ShowDialog() | Out-Null
+    # Show form
+    [void]$form.ShowDialog()
 }
 
-# Execute the function to display the form
-Show-ExchangePermissionTool
+# Run the tool
+Show-ExchangeTool
+'@
+
+# Execute the code
+Invoke-Expression $code
