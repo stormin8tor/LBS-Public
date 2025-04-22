@@ -1,8 +1,8 @@
 Add-Type -AssemblyName PresentationFramework
 Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
 
-# XAML layout for WPF window
-$XAML = @"
+# Define XAML UI
+$xamlString = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Exchange Permission Tool" Height="450" Width="600">
@@ -39,25 +39,23 @@ $XAML = @"
 </Window>
 "@
 
-# Load WPF Window
-$reader = New-Object System.Xml.XmlNodeReader $XAML
+# Load the XAML
+$reader = (New-Object System.Xml.XmlTextReader([System.IO.StringReader]$xamlString))
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
-# Get controls
-$MailboxBox    = $window.FindName("MailboxTextBox")
-$FullBox       = $window.FindName("FullAccessTextBox")
-$SendAsBox     = $window.FindName("SendAsTextBox")
-$OutputBox     = $window.FindName("OutputTextBox")
-$ApplyButton   = $window.FindName("ApplyButton")
+# Access UI elements
+$MailboxBox  = $window.FindName("MailboxTextBox")
+$FullBox     = $window.FindName("FullAccessTextBox")
+$SendAsBox   = $window.FindName("SendAsTextBox")
+$OutputBox   = $window.FindName("OutputTextBox")
+$ApplyButton = $window.FindName("ApplyButton")
 
-# Helper: Write to output box
 function Write-OutputBox {
     param ([string]$Text)
     $OutputBox.AppendText("$Text`n")
     $OutputBox.ScrollToEnd()
 }
 
-# Apply permissions button click handler
 $ApplyButton.Add_Click({
     $OutputBox.Clear()
 
@@ -79,14 +77,14 @@ $ApplyButton.Add_Click({
         Write-OutputBox "`nAssigning Full Access Permissions..."
         foreach ($user in $fullAccessUsers) {
             Write-OutputBox "  Adding Full Access for $user..."
-            # Uncomment below to actually apply
+            # Uncomment below to apply
             # Add-MailboxPermission -Identity $mailbox -User $user -AccessRights FullAccess -InheritanceType All
         }
 
         Write-OutputBox "`nAssigning Send As Permissions..."
         foreach ($user in $sendAsUsers) {
             Write-OutputBox "  Adding Send As for $user..."
-            # Uncomment below to actually apply
+            # Uncomment below to apply
             # Add-RecipientPermission -Identity $mailbox -Trustee $user -AccessRights SendAs -Confirm:$false
         }
 
@@ -96,5 +94,5 @@ $ApplyButton.Add_Click({
     }
 })
 
-# Show the window
+# Show the UI
 $window.ShowDialog() | Out-Null
